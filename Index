@@ -1,0 +1,518 @@
+<html><head><base href="https://bonzi.ai/"><title>Bonzi.AI</title></head><body><style>
+body {
+  margin: 0;
+  padding: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background-image: url('https://external-preview.redd.it/uhq5zTcMPM3tOW_fbUz4PayDt_5pkEXdyXXoRWs3XOg.jpg?auto=webp&s=e06461124c1ccfdba7e9ece763b644ff68eeb06b');
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: cover;
+}
+
+#peedyCanvas, #bonziCanvas, #clippyCanvas, #robbyCanvas, #maxCanvas, #kinitoCanvas {
+  position: absolute;
+  transform-origin: top left;
+}
+
+#modelSelect {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 1000;
+  font-size: 16px;
+  padding: 5px;
+}
+
+#topicInput {
+  position: absolute;
+  top: 50px;
+  left: 10px;
+  z-index: 1000;
+  font-size: 16px;
+  padding: 5px;
+  width: 200px;
+}
+
+#submitTopic {
+  position: absolute;
+  top: 50px;
+  left: 220px;
+  z-index: 1000;
+  font-size: 16px;
+  padding: 5px;
+}
+
+#toggleDrag {
+  position: absolute;
+  top: 90px;
+  left: 10px;
+  z-index: 1000;
+  font-size: 16px;
+  padding: 5px;
+}
+
+.speechBubble {
+  position: absolute;
+  background-color: #fff;
+  border: 2px solid #000;
+  border-radius: 10px;
+  padding: 10px;
+  max-width: 200px;
+  font-family: Arial, sans-serif;
+  font-size: 14px;
+  display: none;
+  z-index: 1001;
+}
+
+.speechBubble:after {
+  content: '';
+  position: absolute;
+  bottom: -10px;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border: 10px solid transparent;
+  border-top-color: #fff;
+  border-bottom: 0;
+  margin-left: -10px;
+}
+
+#watermark {
+  position: fixed;
+  bottom: 10px;
+  right: 10px;
+  font-family: Arial, sans-serif;
+  font-size: 14px;
+  font-weight: bold;
+  z-index: 1002;
+}
+
+#credits {
+  position: fixed;
+  bottom: 30px;
+  right: 10px;
+  font-family: Arial, sans-serif;
+  font-size: 12px;
+  color: #333;
+  z-index: 1002;
+}
+</style>
+
+<select id="modelSelect">
+  <option value="llama-3-70b-chat-turbo" selected="">llama-3-70b-chat-turbo</option>
+  <option value="gpt-3.5-turbo">gpt-3.5-turbo (OpenAI)</option>
+  <option value="claude-2">claude-2 (Anthropic)</option>
+  <option value="palm-2-chat-bison">palm-2-chat-bison (Google)</option>
+  <option value="mistral-7b-instruct">mistral-7b-instruct (Mistral AI)</option>
+  <option value="llama-2-70b-chat">llama-2-70b-chat (Meta)</option>
+  <option value="command-nightly">command-nightly (Cohere)</option>
+  <option value="yi-34b-chat">yi-34b-chat (01.AI)</option>
+</select>
+
+<input type="text" id="topicInput" placeholder="Enter a topic">
+<button id="submitTopic">Submit</button>
+<button id="toggleDrag">Start Dragging</button>
+
+<canvas id="peedyCanvas" width="160" height="128"></canvas>
+<canvas id="bonziCanvas" width="200" height="160"></canvas>
+<canvas id="clippyCanvas" width="200" height="160"></canvas>
+<canvas id="robbyCanvas" width="200" height="160"></canvas>
+<canvas id="maxCanvas" width="200" height="160"></canvas>
+<canvas id="kinitoCanvas" width="200" height="200"></canvas>
+<div id="peedySpeechBubble" class="speechBubble"></div>
+<div id="bonziSpeechBubble" class="speechBubble"></div>
+<div id="clippySpeechBubble" class="speechBubble"></div>
+<div id="robbySpeechBubble" class="speechBubble"></div>
+<div id="maxSpeechBubble" class="speechBubble"></div>
+<div id="kinitoSpeechBubble" class="speechBubble"></div>
+
+<div id="watermark">
+  <span style="color: green;">made </span>
+  <span style="color: yellow;">by the </span>
+  <span style="color: blue;">PDX </span>
+  🇧🇷
+</div>
+
+<div id="credits">
+  Improved by Austin<br>
+  <span style="color: orange;">Fixed by </span><span style="color: green;">zrk</span><br>
+  Credit to Human
+</div>
+
+<script src="https://code.createjs.com/1.0.0/createjs.min.js"></script>
+<script>
+function range(start, end) {
+  return Array.from({length: end - start + 1}, (_, i) => i + start);
+}
+
+let stage, peedySprite, bonziStage, bonziSprite, clippyStage, clippySprite, robbyStage, robbySprite, maxStage, maxSprite, kinitoStage, kinitoSprite;
+let isDraggingEnabled = false;
+
+const peedySpriteSheet = new createjs.SpriteSheet({
+  images: ["https://raw.githubusercontent.com/bonziworld29/BonziWORLD-Revived-Server/main/client/www/img/agents/peedy.png"],
+  frames: {width: 160, height: 128},
+  animations: {
+    idle: 0,
+    surf_away: { frames: range(360, 412), next: "gone", speed: 1},
+    surf_intro: { frames: range(823, 848), next: "idle", speed: 1},
+  }
+});
+
+const bonziSpriteSheet = new createjs.SpriteSheet({
+  images: ["https://raw.githubusercontent.com/bonziworld29/BonziWORLD-Revived-Server/main/client/www/img/agents/purple.png"],
+  frames: {width: 200, height: 160},
+  animations: {
+    idle: 0,
+    enter: [277, 302, "idle", 0.25],
+    leave: [16, 39, 40, 0.25],
+  }
+});
+
+const clippySpriteSheet = new createjs.SpriteSheet({
+  images: ["https://raw.githubusercontent.com/bonziworld29/BonziWORLD-Revived-Server/main/client/www/img/agents/clippy.png"],
+  frames: {width: 200, height: 160},
+  animations: {
+    idle: 0,
+  }
+});
+
+const robbySpriteSheet = new createjs.SpriteSheet({
+  images: ["https://raw.githubusercontent.com/bonziworld29/BonziWORLD-Revived-Server/main/client/www/img/agents/robby.png"],
+  frames: {width: 200, height: 160},
+  animations: {
+    idle: 0,
+  }
+});
+
+const maxSpriteSheet = new createjs.SpriteSheet({
+  images: ["https://raw.githubusercontent.com/bonziworld29/BonziWORLD-Revived-Server/main/client/www/img/agents/max.png"],
+  frames: {width: 200, height: 160},
+  animations: {
+    idle: 0,
+  }
+});
+
+const kinitoSpriteSheet = new createjs.SpriteSheet({
+  images: ["https://static.wikia.nocookie.net/kinitopedia/images/b/bc/KinitoOfficialRender.png"],
+  frames: {width: 200, height: 200},
+  animations: {
+    idle: 0,
+  }
+});
+
+function init() {
+  initPeedy();
+  initBonzi();
+  initClippy();
+  initRobby();
+  initMax();
+  initKinito();
+
+  // Fetch AI models
+  fetchAIModels();
+
+  // Add event listener for topic submission
+  document.getElementById('submitTopic').addEventListener('click', handleTopicSubmission);
+
+  // Add event listener for toggle dragging
+  document.getElementById('toggleDrag').addEventListener('click', toggleDragging);
+
+  // Set initial size and add resize listener
+  resizeCanvases();
+  window.addEventListener("resize", resizeCanvases);
+}
+
+function initPeedy() {
+  stage = new createjs.Stage("peedyCanvas");
+  peedySprite = new createjs.Sprite(peedySpriteSheet, "idle");
+  stage.addChild(peedySprite);
+
+  // Random position for Peedy
+  const peedyCanvas = document.getElementById("peedyCanvas");
+  peedyCanvas.style.left = Math.random() * (window.innerWidth - 80) + "px"; // Adjusted for half size
+  peedyCanvas.style.top = Math.random() * (window.innerHeight - 64) + "px"; // Adjusted for half size
+
+  createjs.Ticker.timingMode = createjs.Ticker.RAF;
+  createjs.Ticker.addEventListener("tick", tick);
+}
+
+function initBonzi() {
+  bonziStage = new createjs.Stage("bonziCanvas");
+  bonziSprite = new createjs.Sprite(bonziSpriteSheet, "idle");
+  bonziStage.addChild(bonziSprite);
+
+  // Random position for Bonzi
+  const bonziCanvas = document.getElementById("bonziCanvas");
+  bonziCanvas.style.left = Math.random() * (window.innerWidth - 100) + "px"; // Adjusted for Bonzi size
+  bonziCanvas.style.top = Math.random() * (window.innerHeight - 80) + "px"; // Adjusted for Bonzi size
+
+  createjs.Ticker.addEventListener("tick", () => bonziStage.update());
+}
+
+function initClippy() {
+  clippyStage = new createjs.Stage("clippyCanvas");
+  clippySprite = new createjs.Sprite(clippySpriteSheet, "idle");
+  clippyStage.addChild(clippySprite);
+
+  // Random position for Clippy
+  const clippyCanvas = document.getElementById("clippyCanvas");
+  clippyCanvas.style.left = Math.random() * (window.innerWidth - 100) + "px";
+  clippyCanvas.style.top = Math.random() * (window.innerHeight - 80) + "px";
+
+  createjs.Ticker.addEventListener("tick", () => clippyStage.update());
+}
+
+function initRobby() {
+  robbyStage = new createjs.Stage("robbyCanvas");
+  robbySprite = new createjs.Sprite(robbySpriteSheet, "idle");
+  robbyStage.addChild(robbySprite);
+
+  // Random position for Robby
+  const robbyCanvas = document.getElementById("robbyCanvas");
+  robbyCanvas.style.left = Math.random() * (window.innerWidth - 100) + "px";
+  robbyCanvas.style.top = Math.random() * (window.innerHeight - 80) + "px";
+
+  createjs.Ticker.addEventListener("tick", () => robbyStage.update());
+}
+
+function initMax() {
+  maxStage = new createjs.Stage("maxCanvas");
+  maxSprite = new createjs.Sprite(maxSpriteSheet, "idle");
+  maxStage.addChild(maxSprite);
+
+  // Random position for Max
+  const maxCanvas = document.getElementById("maxCanvas");
+  maxCanvas.style.left = Math.random() * (window.innerWidth - 100) + "px";
+  maxCanvas.style.top = Math.random() * (window.innerHeight - 80) + "px";
+
+  createjs.Ticker.addEventListener("tick", () => maxStage.update());
+}
+
+function initKinito() {
+  kinitoStage = new createjs.Stage("kinitoCanvas");
+  kinitoSprite = new createjs.Sprite(kinitoSpriteSheet, "idle");
+  kinitoStage.addChild(kinitoSprite);
+
+  // Random position for Kinito
+  const kinitoCanvas = document.getElementById("kinitoCanvas");
+  kinitoCanvas.style.left = Math.random() * (window.innerWidth - 100) + "px";
+  kinitoCanvas.style.top = Math.random() * (window.innerHeight - 100) + "px";
+
+  createjs.Ticker.addEventListener("tick", () => kinitoStage.update());
+}
+
+function toggleDragging() {
+  isDraggingEnabled = !isDraggingEnabled;
+  const toggleButton = document.getElementById('toggleDrag');
+  toggleButton.textContent = isDraggingEnabled ? 'Stop Dragging' : 'Start Dragging';
+
+  const canvases = ["peedyCanvas", "bonziCanvas", "clippyCanvas", "robbyCanvas", "maxCanvas", "kinitoCanvas"];
+
+  canvases.forEach(canvasId => {
+    const canvas = document.getElementById(canvasId);
+    if (isDraggingEnabled) {
+      canvas.style.cursor = 'move';
+      canvas.addEventListener("mousedown", startDrag);
+      canvas.addEventListener("touchstart", startDrag);
+    } else {
+      canvas.style.cursor = 'default';
+      canvas.removeEventListener("mousedown", startDrag);
+      canvas.removeEventListener("touchstart", startDrag);
+    }
+  });
+}
+
+function startDrag(e) {
+  if (!isDraggingEnabled) return;
+
+  e.preventDefault();
+  const canvas = e.currentTarget;
+  const rect = canvas.getBoundingClientRect();
+  const offsetX = (e.clientX || e.touches[0].clientX) - rect.left;
+  const offsetY = (e.clientY || e.touches[0].clientY) - rect.top;
+
+  function moveAt(x, y) {
+    canvas.style.left = x - offsetX + "px";
+    canvas.style.top = y - offsetY + "px";
+  }
+
+  function onMouseMove(e) {
+    moveAt(e.clientX || e.touches[0].clientX, e.clientY || e.touches[0].clientY);
+  }
+
+  document.addEventListener("mousemove", onMouseMove);
+  document.addEventListener("touchmove", onMouseMove);
+
+  canvas.onmouseup = canvas.ontouchend = function() {
+    document.removeEventListener("mousemove", onMouseMove);
+    document.removeEventListener("touchmove", onMouseMove);
+    canvas.onmouseup = canvas.ontouchend = null;
+  };
+}
+
+function resizeCanvases() {
+  const canvases = ["peedyCanvas", "bonziCanvas", "clippyCanvas", "robbyCanvas", "maxCanvas", "kinitoCanvas"];
+  const baseScales = {
+    peedyCanvas: 0.5,
+    bonziCanvas: 0.5,
+    clippyCanvas: 0.5,
+    robbyCanvas: 0.5,
+    maxCanvas: 0.5,
+    kinitoCanvas: 0.25  // Divided by 2 as requested
+  };
+
+  canvases.forEach(canvasId => {
+    const canvas = document.getElementById(canvasId);
+    const baseScale = baseScales[canvasId];
+    const responsiveScale = Math.min(window.innerWidth / 400, window.innerHeight / 320);
+    const finalScale = baseScale * responsiveScale;
+    canvas.style.transform = `scale(${finalScale})`;
+  });
+}
+
+function tick(event) {
+  stage.update(event);
+  bonziStage.update(event);
+  clippyStage.update(event);
+  robbyStage.update(event);
+  maxStage.update(event);
+  kinitoStage.update(event);
+}
+
+function fetchAIModels() {
+  fetch('https://api.llmplayground.net/v1/models')
+    .then(response => response.json())
+    .then(data => {
+      const select = document.getElementById('modelSelect');
+      data.data.forEach(model => {
+        if (model.id !== 'llama-3-70b-chat-turbo') {
+          const option = document.createElement('option');
+          option.value = model.id;
+          option.textContent = `${model.id} (${model.owned_by})`;
+          select.appendChild(option);
+        }
+      });
+    })
+    .catch(error => console.error('Error fetching AI models:', error));
+}
+
+async function displayConversation(messages) {
+  for (const message of messages) {
+    const [character, text] = message.split(': ');
+    if (character && text) {
+      const lowerCharacter = character.toLowerCase();
+      if (['peedy', 'bonzi', 'clippy', 'robby', 'max', 'kinitopet', 'kinito'].includes(lowerCharacter)) {
+        document.querySelectorAll('.speechBubble').forEach(bubble => {
+          bubble.style.display = 'none';
+        });
+
+        displaySpeechBubble(text, lowerCharacter === 'kinitopet' ? 'kinito' : lowerCharacter);
+
+        let voice;
+        switch (lowerCharacter) {
+          case 'peedy':
+            voice = 'Sam';
+            break;
+          case 'bonzi':
+            voice = 'Adult Male #2, American English (TruVoice)';
+            break;
+          case 'clippy':
+            voice = 'Mike';
+            break;
+          case 'robby':
+            voice = 'Adult Male #1, American English (TruVoice)';
+            break;
+          case 'max':
+            voice = 'Mary';
+            break;
+          case 'kinitopet':
+          case 'kinito':
+            voice = 'Adult Male #3, American English (TruVoice)';
+            break;
+        }
+        speakText(text, voice);
+
+        await new Promise(resolve => setTimeout(resolve, text.length * 100 + 2000));
+      }
+    }
+  }
+}
+
+function handleTopicSubmission() {
+  const topic = document.getElementById('topicInput').value;
+  const model = document.getElementById('modelSelect').value;
+
+  if (!topic || !model) {
+    alert('Please select a model and enter a topic');
+    return;
+  }
+
+  const payload = {
+    model: model,
+    messages: [
+      {
+        role: "user",
+        content: `Generate a short conversation between Peedy (a talking parrot), Bonzi (a purple gorilla assistant), Clippy (a paperclip assistant), Robby (a robot), Max (a dog), and KinitoPET (a malevolent AI entity disguised as a friendly assistant) about ${topic}. Start with a greeting and mention the topic. Keep responses short, fun, and playful. For KinitoPET, subtly hint at its true nature without being overtly malicious.`
+      }
+    ],
+    max_tokens: 300,
+    temperature: 0.7
+  };
+
+  fetch('https://api.llmplayground.net/v1/chat/completions', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload)
+  })
+    .then(response => response.json())
+    .then(data => {
+      const response = data.choices[0].message.content;
+      const messages = response.split('\n');
+      displayConversation(messages);
+    })
+    .catch(error => console.error('Error:', error));
+}
+
+function displaySpeechBubble(text, character) {
+  const speechBubble = document.getElementById(`${character}SpeechBubble`);
+  const canvas = document.getElementById(`${character}Canvas`);
+  const rect = canvas.getBoundingClientRect();
+
+  speechBubble.innerHTML = ''; // Clear existing content
+  const words = text.split(' ');
+  let currentIndex = 0;
+
+  function displayNextWord() {
+    if (currentIndex < words.length) {
+      speechBubble.innerHTML += words[currentIndex] + ' ';
+      currentIndex++;
+      setTimeout(displayNextWord, 200); // Display a new word every 200ms
+    }
+  }
+
+  speechBubble.style.display = 'block';
+  speechBubble.style.left = `${rect.left + rect.width / 2 - speechBubble.offsetWidth / 2}px`;
+  speechBubble.style.top = `${rect.top - speechBubble.offsetHeight - 20}px`;
+
+  displayNextWord();
+}
+
+function speakText(text, voice) {
+  let pitch = 140;
+  let speed = 157;
+  
+  if (voice === 'Adult Male #3, American English (TruVoice)') {
+    pitch = 135;
+    speed = 125;
+  }
+  
+  const url = `https://www.tetyys.com/SAPI4/SAPI4?text=${encodeURIComponent(text)}&voice=${encodeURIComponent(voice)}&pitch=${pitch}&speed=${speed}`;
+  const audio = new Audio(url);
+  audio.play();
+}
+
+window.addEventListener("load", init);
+</script>
+</body></html>
